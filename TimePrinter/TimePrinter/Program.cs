@@ -8,7 +8,7 @@ using Rebus.Routing.TypeBased;
 
 namespace TimePrinter
 {
-    class Program
+	class Program
     {
         const string InputQueueName = "my-app.input";
 
@@ -25,7 +25,7 @@ namespace TimePrinter
                     .Routing(r => r.TypeBased().Map<DateTime>(InputQueueName))
                     .Start();
 
-                timer.Elapsed += delegate { bus.Send(DateTime.Now).Wait(); };
+                timer.Elapsed += delegate { bus.TypedSend(DateTime.Now, x => x.Handle).Wait(); };
                 timer.Interval = 1000;
                 timer.Start();
 
