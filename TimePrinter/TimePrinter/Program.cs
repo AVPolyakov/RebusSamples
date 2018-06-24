@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Threading.Tasks;
 using System.Timers;
+using Contracts;
+using MessageHandlers.Host;
 using Rebus.Activation;
 using Rebus.Config;
-using Rebus.Handlers;
 using Rebus.Routing.TypeBased;
 
 namespace TimePrinter
@@ -17,15 +18,17 @@ namespace TimePrinter
             using (var activator = new BuiltinHandlerActivator())
             using (var timer = new Timer())
             {
-                activator.Register(() => new PrintDateTime());
+                activator.RegisterBusHandler(() => new DepositBusHandler());
 
                 var bus = Configure.With(activator)
                     .Logging(l => l.None())
                     .Transport(t => t.UseMsmq(InputQueueName))
-                    .Routing(r => r.TypeBased().Map<DateTime>(InputQueueName))
+                    .Routing(r => r.TypeBased().Map<CreateAutopayRequest>(InputQueueName))
                     .Start();
 
-                timer.Elapsed += delegate { bus.Send(DateTime.Now).Wait(); };
+                timer.Elapsed += delegate {
+                    bus.Deposit().CreateAutopay(new CreateAutopayRequest {DepositId = 33}).Wait();
+                };
                 timer.Interval = 1000;
                 timer.Start();
 
@@ -34,12 +37,39 @@ namespace TimePrinter
             }
         }
     }
+}
 
-    class PrintDateTime : IHandleMessages<DateTime>
+namespace Contracts
+{
+    public interface IDepositBusHandler
     {
-        public async Task Handle(DateTime currentDateTime)
+        Task CreateAutopay(CreateAutopayRequest request);
+    }
+
+    public class CreateAutopayRequest
+    {
+        public long DepositId { get; set; }
+    }
+}
+
+namespace MessageHandlers.Host
+{
+    public class DepositBusHandler : IDepositBusHandler
+    {
+        public Task CreateAutopay(CreateAutopayRequest request)
         {
-            Console.WriteLine("The time is {0}", currentDateTime);
+            Console.WriteLine($"DepositId = {request.DepositId}");
+            return Task.CompletedTask;
         }
     }
 }
+
+//namespace Tests
+//{
+//    [Fact]
+//    Task Test1()
+//    {
+//        var message = ...
+//        await _busHost.Deposit().CreateAutopay(new CreateAutopayRequest {DepositId = 33});
+//    }
+//}
